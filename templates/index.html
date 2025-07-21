@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oral Cancer Survival Prediction</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { 
+            padding: 20px; 
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .prediction-card {
+            margin-top: 20px;
+            display: none;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+            border-radius: 0.5rem;
+        }
+        .form-text {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+        .feature-description {
+            margin-bottom: 0.25rem;
+        }
+        .form-select {
+            padding: 0.75rem;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 0.375rem;
+        }
+        .form-select:hover {
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.1);
+        }
+        .form-label {
+            font-weight: 500;
+            color: #212529;
+            margin-bottom: 0.5rem;
+        }
+        .invalid-feedback {
+            display: block;
+        }
+        .card {
+            border: none;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .card-header {
+            background-color: #f8f9fa;
+            border-bottom: 1px solid rgba(0,0,0,.125);
+            padding: 1rem;
+            border-radius: 0.5rem 0.5rem 0 0 !important;
+        }
+        .card-body {
+            padding: 1.5rem;
+        }
+        .btn-primary {
+            padding: 0.75rem 2rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .alert {
+            border-radius: 0.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .progress {
+            height: 2rem;
+            border-radius: 1rem;
+            margin: 1rem 0;
+            box-shadow: inset 0 1px 2px rgba(0,0,0,.1);
+        }
+        .progress-bar {
+            transition: width 0.6s ease;
+            font-size: 1rem;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mb-4 text-center">Oral Cancer Risk Assessment</h1>
+        <div class="alert alert-info mb-4">
+            <h5 class="alert-heading">Instructions</h5>
+            <p class="mb-0">Please provide accurate information for all fields below to assess oral cancer risk. This assessment tool considers multiple risk factors including lifestyle, medical history, and environmental factors.</p>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <form id="predictionForm" class="needs-validation" novalidate>
+                    <!-- Substance Use Section -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Substance Use History</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Tobacco Use -->
+                            <div class="mb-3">
+                                <label for="Tobacco Use" class="form-label fw-bold">Tobacco Use</label>
+                                <select class="form-select" id="Tobacco Use" name="Tobacco Use" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['Tobacco Use'] }}</div>
+                            </div>
+                            
+                            <!-- Alcohol Consumption -->
+                            <div class="mb-3">
+                                <label for="Alcohol Consumption" class="form-label fw-bold">Alcohol Consumption</label>
+                                <select class="form-select" id="Alcohol Consumption" name="Alcohol Consumption" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['Alcohol Consumption'] }}</div>
+                            </div>
+
+                            <!-- Betel Quid Use -->
+                            <div class="mb-3">
+                                <label for="Betel Quid Use" class="form-label fw-bold">Betel Quid Use</label>
+                                <select class="form-select" id="Betel Quid Use" name="Betel Quid Use" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['Betel Quid Use'] }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Medical Conditions Section -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Medical Conditions</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- HPV Infection -->
+                            <div class="mb-3">
+                                <label for="HPV Infection" class="form-label fw-bold">HPV Infection</label>
+                                <select class="form-select" id="HPV Infection" name="HPV Infection" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['HPV Infection'] }}</div>
+                            </div>
+
+                            <!-- Compromised Immune System -->
+                            <div class="mb-3">
+                                <label for="Compromised Immune System" class="form-label fw-bold">Compromised Immune System</label>
+                                <select class="form-select" id="Compromised Immune System" name="Compromised Immune System" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['Compromised Immune System'] }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lifestyle & Environmental Factors -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Lifestyle & Environmental Factors</h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Diet -->
+                            <div class="mb-3">
+                                <label for="Diet (Fruits & Vegetables Intake)" class="form-label fw-bold">Diet (Fruits & Vegetables Intake)</label>
+                                <select class="form-select" id="Diet (Fruits & Vegetables Intake)" name="Diet (Fruits & Vegetables Intake)" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="0">Low (Less than 2 servings per day)</option>
+                                    <option value="1">Moderate (2-4 servings per day)</option>
+                                    <option value="2">High (5 or more servings per day)</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['Diet (Fruits & Vegetables Intake)'] }}</div>
+                            </div>
+
+                            <!-- Oral Hygiene -->
+                            <div class="mb-3">
+                                <label for="Poor Oral Hygiene" class="form-label fw-bold">Poor Oral Hygiene</label>
+                                <select class="form-select" id="Poor Oral Hygiene" name="Poor Oral Hygiene" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['Poor Oral Hygiene'] }}</div>
+                            </div>
+
+                            <!-- Sun Exposure -->
+                            <div class="mb-3">
+                                <label for="Chronic Sun Exposure" class="form-label fw-bold">Chronic Sun Exposure</label>
+                                <select class="form-select" id="Chronic Sun Exposure" name="Chronic Sun Exposure" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['Chronic Sun Exposure'] }}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Family History Section -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Family History</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="Family History of Cancer" class="form-label fw-bold">Family History of Cancer</label>
+                                <select class="form-select" id="Family History of Cancer" name="Family History of Cancer" required>
+                                    <option value="" selected disabled>Select an option</option>
+                                    <option value="1">Yes</option>
+                                    <option value="0">No</option>
+                                </select>
+                                <div class="form-text">{{ descriptions['Family History of Cancer'] }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Predict Survival</button>
+                </form>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="sticky-top" style="top: 20px;">
+                    <div id="predictionResult" class="card prediction-card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="card-title mb-0">Risk Assessment Results</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="result-section">
+                                <p class="card-text" id="prediction"></p>
+                                <div class="mb-2 fw-bold">Risk Level Indicator:</div>
+                                <div class="progress mb-3" style="height: 2rem;">
+                                    <div id="probabilityBar" class="progress-bar" role="progressbar" style="width: 0%">
+                                        <span class="progress-text"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="risk-factors mt-4" style="display: none;">
+                                <h6 class="mb-3">Key Risk Factors Identified:</h6>
+                                <ul id="riskFactorsList" class="list-group list-group-flush">
+                                    <!-- Risk factors will be populated here -->
+                                </ul>
+                            </div>
+
+                            <div class="recommendations mt-4" style="display: none;">
+                                <h6 class="mb-3">Recommendations:</h6>
+                                <div id="recommendationsList" class="alert alert-success">
+                                    <!-- Recommendations will be populated here -->
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-warning mt-4">
+                                <h6 class="alert-heading">Important Notice</h6>
+                                <p class="mb-0"><small>
+                                    This is a preliminary risk assessment based on the provided information. 
+                                    The results should not be considered as a medical diagnosis. 
+                                    Please consult with a healthcare professional for a thorough evaluation, 
+                                    especially if you have concerns about your oral health.
+                                </small></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            // Add validation styles on input change
+            $('.form-select').on('change', function() {
+                if (this.value) {
+                    $(this).removeClass('is-invalid').addClass('is-valid');
+                } else {
+                    $(this).removeClass('is-valid').addClass('is-invalid');
+                }
+            });
+
+            function updateRiskFactors(formData) {
+                const riskFactors = [];
+                if (formData.get('Tobacco Use') === '1') riskFactors.push('Tobacco use detected');
+                if (formData.get('Alcohol Consumption') === '1') riskFactors.push('Regular alcohol consumption');
+                if (formData.get('HPV Infection') === '1') riskFactors.push('HPV infection present');
+                if (formData.get('Betel Quid Use') === '1') riskFactors.push('Betel quid use detected');
+                if (formData.get('Poor Oral Hygiene') === '1') riskFactors.push('Poor oral hygiene');
+                if (formData.get('Diet (Fruits & Vegetables Intake)') === '0') riskFactors.push('Low fruits and vegetables intake');
+                if (formData.get('Family History of Cancer') === '1') riskFactors.push('Family history of cancer');
+                if (formData.get('Compromised Immune System') === '1') riskFactors.push('Compromised immune system');
+                if (formData.get('Chronic Sun Exposure') === '1') riskFactors.push('Chronic sun exposure');
+
+                return riskFactors;
+            }
+
+            function getRecommendations(riskFactors, probability) {
+                let recommendations = [];
+                
+                if (probability >= 50) {
+                    recommendations.push("Schedule an immediate consultation with an oral health specialist.");
+                }
+
+                if (riskFactors.includes('Tobacco use detected')) {
+                    recommendations.push("Consider tobacco cessation programs and seek professional help to quit smoking.");
+                }
+
+                if (riskFactors.includes('Regular alcohol consumption')) {
+                    recommendations.push("Reduce alcohol consumption and consider speaking with a healthcare provider about safe drinking limits.");
+                }
+
+                if (riskFactors.includes('Poor oral hygiene')) {
+                    recommendations.push("Improve oral hygiene routine: brush twice daily, floss regularly, and schedule regular dental check-ups.");
+                }
+
+                if (riskFactors.includes('Low fruits and vegetables intake')) {
+                    recommendations.push("Increase daily intake of fruits and vegetables to at least 5 servings per day.");
+                }
+
+                if (riskFactors.includes('Chronic sun exposure')) {
+                    recommendations.push("Use lip balm with SPF and minimize prolonged sun exposure.");
+                }
+
+                return recommendations;
+            }
+
+            $('#predictionForm').on('submit', function(e) {
+                e.preventDefault();
+                
+                // Validate all fields
+                let isValid = true;
+                $(this).find('select, input').each(function() {
+                    if (!this.value) {
+                        $(this).addClass('is-invalid');
+                        isValid = false;
+                    }
+                });
+                
+                if (!isValid) {
+                    alert('Please fill out all fields');
+                    return;
+                }
+                
+                // Show loading state
+                $('.prediction-card').show();
+                $('#probabilityBar').addClass('progress-bar-striped progress-bar-animated');
+                
+                const formData = new FormData(this);
+                
+                $.ajax({
+                    url: '/predict',
+                    method: 'POST',
+                    data: $(this).serialize(),
+                    success: function(response) {
+                        if (response.success) {
+                            // Remove loading state
+                            $('#probabilityBar').removeClass('progress-bar-striped progress-bar-animated');
+                            
+                            // Update prediction
+                            const probability = response.probability.toFixed(1);
+                            let riskLevel, riskClass, textColor;
+                            
+                            if (probability < 25) {
+                                riskLevel = "Low Risk";
+                                riskClass = "bg-success";
+                                textColor = "text-success";
+                            } else if (probability < 50) {
+                                riskLevel = "Moderate Risk";
+                                riskClass = "bg-warning";
+                                textColor = "text-warning";
+                            } else if (probability < 75) {
+                                riskLevel = "High Risk";
+                                riskClass = "bg-danger";
+                                textColor = "text-danger";
+                            } else {
+                                riskLevel = "Very High Risk";
+                                riskClass = "bg-danger";
+                                textColor = "text-danger";
+                            }
+                            
+                            // Update main prediction
+                            $('#prediction').html(
+                                `<h4 class="mb-3 ${textColor}">${riskLevel}</h4>` +
+                                `<p class="mb-1"><strong>Risk Score:</strong> ${probability}%</p>` +
+                                `<p class="text-muted"><small>Based on the provided risk factors</small></p>`
+                            );
+                            
+                            // Update progress bar
+                            $('#probabilityBar')
+                                .css('width', `${probability}%`)
+                                .removeClass('bg-success bg-warning bg-danger')
+                                .addClass(riskClass)
+                                .find('.progress-text')
+                                .text(`${probability}%`);
+
+                            // Update risk factors
+                            const riskFactors = updateRiskFactors(formData);
+                            if (riskFactors.length > 0) {
+                                $('.risk-factors').show();
+                                const riskList = $('#riskFactorsList').empty();
+                                riskFactors.forEach(factor => {
+                                    riskList.append(`<li class="list-group-item"><i class="fas fa-exclamation-triangle text-warning me-2"></i>${factor}</li>`);
+                                });
+                            } else {
+                                $('.risk-factors').hide();
+                            }
+
+                            // Update recommendations
+                            const recommendations = getRecommendations(riskFactors, probability);
+                            if (recommendations.length > 0) {
+                                $('.recommendations').show();
+                                const recList = $('#recommendationsList').empty();
+                                recommendations.forEach(rec => {
+                                    recList.append(`<p class="mb-2"><i class="fas fa-check-circle text-success me-2"></i>${rec}</p>`);
+                                });
+                            } else {
+                                $('.recommendations').hide();
+                            }
+
+                        } else {
+                            alert('Error: ' + response.error);
+                        }
+                    },
+                    error: function() {
+                        alert('Server error occurred');
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
