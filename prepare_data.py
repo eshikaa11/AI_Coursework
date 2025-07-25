@@ -19,6 +19,10 @@ from sklearn.preprocessing import StandardScaler
 import warnings
 warnings.filterwarnings('ignore')
 
+# Set up plotting style
+plt.style.use('default')
+sns.set_palette("husl")
+
 class OralCancerDataPreprocessor:
     """
     Comprehensive data preprocessing pipeline for oral cancer risk assessment.
@@ -215,6 +219,127 @@ class OralCancerDataPreprocessor:
         
         print("="*50)
 
+    def create_before_after_visualization(self, original_df, processed_df, output_dir="Datasets/plots"):
+        """
+        Create simple before/after preprocessing visualizations for documentation.
+        
+        Args:
+            original_df (pd.DataFrame): Original dataset
+            processed_df (pd.DataFrame): Processed dataset  
+            output_dir (str): Directory to save plots
+        """
+        print(f"\n📊 Creating before/after visualizations...")
+        
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Create figure with subplots
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
+        fig.suptitle('Data Preprocessing: Before vs After', fontsize=16, fontweight='bold')
+        
+        # 1. Target distribution comparison
+        ax1.pie(original_df['Oral Cancer (Diagnosis)'].value_counts(), 
+                labels=['No Cancer', 'Cancer'], autopct='%1.1f%%', startangle=90,
+                colors=['lightgreen', 'lightcoral'])
+        ax1.set_title('Target Distribution\n(Before & After - Same)', fontweight='bold')
+        
+        # 2. Feature encoding example - Tobacco Use
+        tobacco_before = original_df['Tobacco Use'].value_counts()
+        tobacco_after = processed_df['Tobacco Use'].value_counts()
+        
+        x = ['No', 'Yes']
+        before_counts = [tobacco_before.get('No', 0), tobacco_before.get('Yes', 0)]
+        after_counts = [tobacco_after.get(0, 0), tobacco_after.get(1, 0)]
+        
+        x_pos = np.arange(len(x))
+        width = 0.35
+        
+        ax2.bar(x_pos - width/2, before_counts, width, label='Before (Yes/No)', 
+                color='skyblue', alpha=0.7)
+        ax2.bar(x_pos + width/2, after_counts, width, label='After (1/0)', 
+                color='orange', alpha=0.7)
+        ax2.set_xlabel('Tobacco Use')
+        ax2.set_ylabel('Count')
+        ax2.set_title('Feature Encoding Example\n(Tobacco Use)', fontweight='bold')
+        ax2.set_xticks(x_pos)
+        ax2.set_xticklabels(x)
+        ax2.legend()
+        ax2.grid(axis='y', alpha=0.3)
+        
+        # 3. Diet feature transformation
+        diet_before = original_df['Diet (Fruits & Vegetables Intake)'].value_counts()
+        
+        ax3.bar(diet_before.index, diet_before.values, color='lightblue', alpha=0.7)
+        ax3.set_xlabel('Diet Level')
+        ax3.set_ylabel('Count')
+        ax3.set_title('Diet Feature - BEFORE\n(Categorical: Low/Moderate/High)', fontweight='bold')
+        ax3.grid(axis='y', alpha=0.3)
+        
+        # Diet after (scaled values)
+        ax4.hist(processed_df['Diet (Fruits & Vegetables Intake)'], bins=20, 
+                color='lightcoral', alpha=0.7, edgecolor='black')
+        ax4.set_xlabel('Scaled Values')
+        ax4.set_ylabel('Count')
+        ax4.set_title('Diet Feature - AFTER\n(Scaled Numerical)', fontweight='bold')
+        ax4.grid(axis='y', alpha=0.3)
+        
+        plt.tight_layout()
+        
+        # Save the plot
+        plot_path = os.path.join(output_dir, 'preprocessing_before_after.png')
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # Create a simple summary table
+        self._create_summary_table(original_df, processed_df, output_dir)
+        
+        print(f"✅ Visualizations saved to: {plot_path}")
+        
+    def _create_summary_table(self, original_df, processed_df, output_dir):
+        """Create a simple summary comparison table."""
+        
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.axis('tight')
+        ax.axis('off')
+        
+        # Prepare summary data
+        summary_data = [
+            ['Dataset Size', f"{len(original_df):,} rows", f"{len(processed_df):,} rows"],
+            ['Features', f"{len(original_df.columns)} columns", f"{len(processed_df.columns)} columns"],
+            ['Missing Values', f"{original_df.isnull().sum().sum():,}", f"{processed_df.isnull().sum().sum():,}"],
+            ['Data Types', "Mixed (text/numbers)", "All numerical"],
+            ['Tobacco Use (Yes)', f"{(original_df['Tobacco Use'] == 'Yes').sum():,}", f"{processed_df['Tobacco Use'].sum():,}"],
+            ['Cancer Cases', f"{(original_df['Oral Cancer (Diagnosis)'] == 'Yes').sum():,}", f"{processed_df['Oral Cancer (Diagnosis)'].sum():,}"],
+        ]
+        
+        table = ax.table(cellText=summary_data,
+                        colLabels=['Metric', 'Before Processing', 'After Processing'],
+                        cellLoc='center',
+                        loc='center',
+                        bbox=[0, 0, 1, 1])
+        
+        table.auto_set_font_size(False)
+        table.set_fontsize(10)
+        table.scale(1, 2)
+        
+        # Style the table
+        for i in range(len(summary_data) + 1):
+            for j in range(3):
+                if i == 0:  # Header row
+                    table[(i, j)].set_facecolor('#4CAF50')
+                    table[(i, j)].set_text_props(weight='bold', color='white')
+                else:
+                    table[(i, j)].set_facecolor('#f0f0f0' if i % 2 == 0 else 'white')
+        
+        plt.title('Preprocessing Summary Comparison', fontsize=14, fontweight='bold', pad=20)
+        
+        # Save summary table
+        summary_path = os.path.join(output_dir, 'preprocessing_summary.png')
+        plt.savefig(summary_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        print(f"✅ Summary table saved to: {summary_path}")
+
     def save_prepared_data(self, output_path):
         """
         Execute preprocessing pipeline and save cleaned data.
@@ -224,8 +349,15 @@ class OralCancerDataPreprocessor:
         """
         print(f"\n💾 Saving processed data to: {output_path}")
         
+        # Load original data for comparison
+        original_df = pd.read_csv(self.input_path)
+        print(f"📊 Original dataset loaded: {original_df.shape}")
+        
         # Execute preprocessing
         processed_df = self.load_and_prepare()
+        
+        # Create before/after visualizations
+        self.create_before_after_visualization(original_df, processed_df)
         
         # Ensure output directory exists
         os.makedirs(os.path.dirname(output_path), exist_ok=True)

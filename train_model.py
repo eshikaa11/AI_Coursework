@@ -34,11 +34,16 @@ from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score,
     roc_curve, auc
 )
-from imblearn.over_sampling import SMOTE
+from sklearn.utils import resample
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
+
+# Set up plotting style for documentation
+plt.style.use('default')
+sns.set_palette("husl")
+plt.rcParams['figure.dpi'] = 300
 
 # Configuration
 # =============
@@ -72,13 +77,25 @@ class OralCancerModel:
             X, y, test_size=0.2, random_state=42, stratify=y
         )
 
-        # Apply SMOTE with adjusted sampling strategy
-        smote = SMOTE(
-            random_state=42,
-            sampling_strategy='auto',  # automatically determine the sampling ratio
-            k_neighbors=5  # reduce neighbors for better boundary handling
-        )
-        self.X_train, self.y_train = smote.fit_resample(X_train, y_train)
+        # Handle class imbalance using sklearn's resample (oversampling minority class)
+        df_train = pd.concat([pd.DataFrame(X_train), pd.Series(y_train, name='target')], axis=1)
+        
+        # Separate majority and minority classes
+        df_majority = df_train[df_train.target == 0]
+        df_minority = df_train[df_train.target == 1]
+        
+        # Upsample minority class to balance the dataset
+        df_minority_upsampled = resample(df_minority, 
+                                       replace=True,     # sample with replacement
+                                       n_samples=len(df_majority),    # to match majority class
+                                       random_state=42)  # reproducible results
+        
+        # Combine majority class with upsampled minority class
+        df_upsampled = pd.concat([df_majority, df_minority_upsampled])
+        
+        # Extract features and target from resampled data
+        self.X_train = df_upsampled.drop('target', axis=1)
+        self.y_train = df_upsampled.target
         self.X_test, self.y_test = X_test, y_test
 
         # Print dataset shapes and class distributions
@@ -106,9 +123,23 @@ class OralCancerModel:
             X_fold_train, X_fold_val = X[train_idx], X[val_idx]
             y_fold_train, y_fold_val = y[train_idx], y[val_idx]
             
-            # Apply SMOTE to training fold only
-            smote = SMOTE(random_state=42, sampling_strategy='auto', k_neighbors=5)
-            X_fold_train_resampled, y_fold_train_resampled = smote.fit_resample(X_fold_train, y_fold_train)
+            # Handle class imbalance using resample for this fold
+            df_fold = pd.concat([pd.DataFrame(X_fold_train), pd.Series(y_fold_train, name='target')], axis=1)
+            df_majority = df_fold[df_fold.target == 0]
+            df_minority = df_fold[df_fold.target == 1]
+            
+            # Only resample if minority class exists
+            if len(df_minority) > 0 and len(df_majority) > 0:
+                df_minority_upsampled = resample(df_minority, 
+                                               replace=True,
+                                               n_samples=len(df_majority),
+                                               random_state=42)
+                df_resampled = pd.concat([df_majority, df_minority_upsampled])
+                X_fold_train_resampled = df_resampled.drop('target', axis=1).values
+                y_fold_train_resampled = df_resampled.target.values
+            else:
+                X_fold_train_resampled = X_fold_train
+                y_fold_train_resampled = y_fold_train
             
             # Train model on the fold
             model = LogisticRegression(**self.best_params, max_iter=2000)
@@ -181,6 +212,135 @@ class OralCancerModel:
         
         print("\nFeature Importance:")
         print(feature_importance)
+        
+        # Create feature importance visualization
+        self.create_feature_importance_plot(feature_importance)
+        
+        # Create class distribution visualization
+        self.create_class_distribution_plot()
+
+    def create_feature_importance_plot(self, feature_importance, save_dir="results/plots"):
+        """Create a simple feature importance visualization for documentation."""
+        os.makedirs(save_dir, exist_ok=True)
+        
+        plt.figure(figsize=(10, 6))
+        bars = plt.barh(feature_importance['Feature'], feature_importance['Importance'], 
+                       color='skyblue', alpha=0.8)
+        
+        # Add value labels on bars
+        for i, bar in enumerate(bars):
+            width = bar.get_width()
+            plt.text(width + 0.01, bar.get_y() + bar.get_height()/2, 
+                    f'{width:.3f}', ha='left', va='center', fontsize=9)
+        
+        plt.xlabel('Feature Importance')
+        plt.title('Feature Importance - Oral Cancer Risk Factors', fontweight='bold')
+        plt.gca().invert_yaxis()
+        plt.tight_layout()
+        
+        # Save plot
+        plt.savefig(f"{save_dir}/feature_importance.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Feature importance plot saved to: {save_dir}/feature_importance.png")
+
+    def create_class_distribution_plot(self, save_dir="results/plots"):
+        """Create a simple class distribution visualization for documentation."""
+        os.makedirs(save_dir, exist_ok=True)
+        
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+        fig.suptitle('Class Distribution: Before and After Balancing', fontsize=14, fontweight='bold')
+        
+        # Original distribution (from the full dataset)
+        original_dist = self.df['Oral Cancer (Diagnosis)'].value_counts()
+        colors = ['lightgreen', 'lightcoral']
+        
+        ax1.pie(original_dist.values, labels=['No Cancer', 'Cancer'], 
+                autopct='%1.1f%%', startangle=90, colors=colors)
+        ax1.set_title('Original Dataset', fontweight='bold')
+        
+        # Training set distribution (after balancing)
+        train_dist = pd.Series(self.y_train).value_counts()
+        ax2.pie(train_dist.values, labels=['No Cancer', 'Cancer'], 
+                autopct='%1.1f%%', startangle=90, colors=colors)
+        ax2.set_title('Training Set (After Balancing)', fontweight='bold')
+        
+        plt.tight_layout()
+        plt.savefig(f"{save_dir}/class_distribution.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Class distribution plot saved to: {save_dir}/class_distribution.png")
+
+    def create_model_performance_summary(self, save_dir="results/plots"):
+        """Create a simple model performance summary visualization."""
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # Get predictions for visualization
+        y_pred = self.model.predict(self.X_test)
+        y_prob = self.model.predict_proba(self.X_test)[:, 1]
+        
+        # Create a 2x2 subplot
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(12, 10))
+        fig.suptitle('Model Performance Summary', fontsize=16, fontweight='bold')
+        
+        # 1. Confusion Matrix
+        cm = confusion_matrix(self.y_test, y_pred)
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', ax=ax1,
+                   xticklabels=['No Cancer', 'Cancer'], 
+                   yticklabels=['No Cancer', 'Cancer'])
+        ax1.set_title('Confusion Matrix', fontweight='bold')
+        ax1.set_xlabel('Predicted')
+        ax1.set_ylabel('Actual')
+        
+        # 2. ROC Curve
+        fpr, tpr, _ = roc_curve(self.y_test, y_prob)
+        roc_auc = auc(fpr, tpr)
+        ax2.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC Curve (AUC = {roc_auc:.2f})')
+        ax2.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', alpha=0.5)
+        ax2.set_xlim([0.0, 1.0])
+        ax2.set_ylim([0.0, 1.05])
+        ax2.set_xlabel('False Positive Rate')
+        ax2.set_ylabel('True Positive Rate')
+        ax2.set_title('ROC Curve', fontweight='bold')
+        ax2.legend(loc="lower right")
+        ax2.grid(alpha=0.3)
+        
+        # 3. Performance Metrics Bar Chart
+        metrics = {
+            'Accuracy': accuracy_score(self.y_test, y_pred),
+            'Precision': precision_score(self.y_test, y_pred),
+            'Recall': recall_score(self.y_test, y_pred),
+            'F1-Score': f1_score(self.y_test, y_pred)
+        }
+        
+        bars = ax3.bar(metrics.keys(), metrics.values(), 
+                      color=['lightblue', 'lightgreen', 'lightcoral', 'lightyellow'],
+                      alpha=0.8)
+        
+        # Add value labels on bars
+        for bar, value in zip(bars, metrics.values()):
+            ax3.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
+                    f'{value:.3f}', ha='center', va='bottom', fontweight='bold')
+        
+        ax3.set_ylabel('Score')
+        ax3.set_title('Performance Metrics', fontweight='bold')
+        ax3.set_ylim(0, 1.1)
+        ax3.grid(axis='y', alpha=0.3)
+        
+        # 4. Class Distribution in Test Set
+        test_dist = pd.Series(self.y_test).value_counts()
+        colors = ['lightgreen', 'lightcoral']
+        wedges, texts, autotexts = ax4.pie(test_dist.values, 
+                                          labels=['No Cancer', 'Cancer'], 
+                                          autopct='%1.1f%%', 
+                                          startangle=90,
+                                          colors=colors)
+        ax4.set_title('Test Set Distribution', fontweight='bold')
+        
+        plt.tight_layout()
+        
+        # Save the comprehensive plot
+        plt.savefig(f"{save_dir}/model_performance_summary.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        print(f"✅ Model performance summary saved to: {save_dir}/model_performance_summary.png")
 
     def evaluate_model(self, save_dir="results/plots"):
         os.makedirs(save_dir, exist_ok=True)
@@ -197,6 +357,10 @@ class OralCancerModel:
         print("Recall: {:.3f} (±{:.3f})".format(*self.kfold_metrics['recall']))
         print("F1-Score: {:.3f} (±{:.3f})".format(*self.kfold_metrics['f1']))
 
+        # Create comprehensive model performance visualization
+        self.create_model_performance_summary(save_dir)
+
+        # Individual plots (keeping the original simple ones)
         # Confusion Matrix
         plt.figure(figsize=(6, 4))
         sns.heatmap(confusion_matrix(self.y_test, y_pred), annot=True, fmt='d', cmap='Blues')
@@ -218,6 +382,8 @@ class OralCancerModel:
         plt.legend()
         plt.savefig(f"{save_dir}/roc_curve.png")
         plt.close()
+        
+        print(f"\n📊 All visualizations saved to: {save_dir}")
 
     def save_model(self, save_dir="results/models"):
         os.makedirs(save_dir, exist_ok=True)
@@ -226,7 +392,7 @@ class OralCancerModel:
         print(f"✅ Model saved to: {save_dir}")
 
 def main():
-    dataset_path = "Datasets/preprocessed_oral_cancer_balanced.csv"
+    dataset_path = "Datasets/preprocessed_oral_cancer.csv"
     model = OralCancerModel(dataset_path)
     model.prepare_features()
     model.train_logistic_model()
