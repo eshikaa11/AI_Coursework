@@ -35,6 +35,7 @@ from sklearn.metrics import (
     roc_curve, auc
 )
 from sklearn.utils import resample
+from imblearn.over_sampling import SMOTE
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
@@ -67,41 +68,64 @@ class OralCancerModel:
         self.data_path = data_path
         self.df = pd.read_csv(data_path)
         self.model = None
+        self.scaler = StandardScaler()
         self.X_train = self.X_test = self.y_train = self.y_test = None
 
     def prepare_features(self):
         X = self.df.drop('Oral Cancer (Diagnosis)', axis=1)
         y = self.df['Oral Cancer (Diagnosis)']
 
+        # Train-test split with stratification
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, test_size=0.2, random_state=42, stratify=y
         )
 
-        # Handle class imbalance using sklearn's resample (oversampling minority class)
-        df_train = pd.concat([pd.DataFrame(X_train), pd.Series(y_train, name='target')], axis=1)
-        
-        # Separate majority and minority classes
-        df_majority = df_train[df_train.target == 0]
-        df_minority = df_train[df_train.target == 1]
-        
-        # Upsample minority class to balance the dataset
-        df_minority_upsampled = resample(df_minority, 
-                                       replace=True,     # sample with replacement
-                                       n_samples=len(df_majority),    # to match majority class
-                                       random_state=42)  # reproducible results
-        
-        # Combine majority class with upsampled minority class
-        df_upsampled = pd.concat([df_majority, df_minority_upsampled])
-        
-        # Extract features and target from resampled data
-        self.X_train = df_upsampled.drop('target', axis=1)
-        self.y_train = df_upsampled.target
-        self.X_test, self.y_test = X_test, y_test
+        print("\nOriginal dataset shapes:")
+        print(f"Train: {X_train.shape}, Test: {X_test.shape}")
+        print("\nOriginal class distribution in training set:")
+        print(pd.Series(y_train).value_counts())
 
-        # Print dataset shapes and class distributions
-        print("\nDataset shapes:")
+        # Apply feature scaling
+        print("\n🔄 Applying feature scaling...")
+        X_train_scaled = self.scaler.fit_transform(X_train)
+        X_test_scaled = self.scaler.transform(X_test)
+        print("✅ Feature scaling completed")
+
+        # Apply SMOTE for class balancing (after scaling)
+        print("\n⚖️ Applying SMOTE for class balancing...")
+        try:
+            from imblearn.over_sampling import SMOTE
+            smote = SMOTE(random_state=42)
+            X_train_resampled, y_train_resampled = smote.fit_resample(X_train_scaled, y_train)
+            print("✅ SMOTE balancing completed")
+        except ImportError:
+            print("⚠️ SMOTE not available, using alternative resampling...")
+            # Fallback to original resampling method if SMOTE not available
+            df_train = pd.DataFrame(X_train_scaled, columns=X.columns)
+            df_train['target'] = y_train.values
+            
+            df_majority = df_train[df_train.target == 0]
+            df_minority = df_train[df_train.target == 1]
+            
+            df_minority_upsampled = resample(df_minority, 
+                                           replace=True,
+                                           n_samples=len(df_majority),
+                                           random_state=42)
+            
+            df_resampled = pd.concat([df_majority, df_minority_upsampled])
+            X_train_resampled = df_resampled.drop('target', axis=1).values
+            y_train_resampled = df_resampled.target.values
+
+        # Store the processed data
+        self.X_train = X_train_resampled
+        self.y_train = y_train_resampled
+        self.X_test = X_test_scaled
+        self.y_test = y_test
+
+        # Print final dataset shapes and class distributions
+        print("\nFinal dataset shapes:")
         print(f"Train: {self.X_train.shape}, Test: {self.X_test.shape}")
-        print("\nClass distribution in training set:")
+        print("\nFinal class distribution in training set:")
         print(pd.Series(self.y_train).value_counts())
         print("\nClass distribution in test set:")
         print(pd.Series(self.y_test).value_counts())
@@ -123,36 +147,47 @@ class OralCancerModel:
             X_fold_train, X_fold_val = X[train_idx], X[val_idx]
             y_fold_train, y_fold_val = y[train_idx], y[val_idx]
             
-            # Handle class imbalance using resample for this fold
-            df_fold = pd.concat([pd.DataFrame(X_fold_train), pd.Series(y_fold_train, name='target')], axis=1)
-            df_majority = df_fold[df_fold.target == 0]
-            df_minority = df_fold[df_fold.target == 1]
+            # Scale features for current fold
+            fold_scaler = StandardScaler()
+            X_fold_train_scaled = fold_scaler.fit_transform(X_fold_train)
+            X_fold_val_scaled = fold_scaler.transform(X_fold_val)
             
-            # Only resample if minority class exists
-            if len(df_minority) > 0 and len(df_majority) > 0:
-                df_minority_upsampled = resample(df_minority, 
-                                               replace=True,
-                                               n_samples=len(df_majority),
-                                               random_state=42)
-                df_resampled = pd.concat([df_majority, df_minority_upsampled])
-                X_fold_train_resampled = df_resampled.drop('target', axis=1).values
-                y_fold_train_resampled = df_resampled.target.values
-            else:
-                X_fold_train_resampled = X_fold_train
-                y_fold_train_resampled = y_fold_train
+            # Handle class imbalance using SMOTE or fallback method
+            try:
+                from imblearn.over_sampling import SMOTE
+                smote = SMOTE(random_state=42)
+                X_fold_train_resampled, y_fold_train_resampled = smote.fit_resample(X_fold_train_scaled, y_fold_train)
+            except ImportError:
+                # Fallback to resample method
+                df_fold = pd.DataFrame(X_fold_train_scaled)
+                df_fold['target'] = y_fold_train
+                df_majority = df_fold[df_fold.target == 0]
+                df_minority = df_fold[df_fold.target == 1]
+                
+                if len(df_minority) > 0 and len(df_majority) > 0:
+                    df_minority_upsampled = resample(df_minority, 
+                                                   replace=True,
+                                                   n_samples=len(df_majority),
+                                                   random_state=42)
+                    df_resampled = pd.concat([df_majority, df_minority_upsampled])
+                    X_fold_train_resampled = df_resampled.drop('target', axis=1).values
+                    y_fold_train_resampled = df_resampled.target.values
+                else:
+                    X_fold_train_resampled = X_fold_train_scaled
+                    y_fold_train_resampled = y_fold_train
             
             # Train model on the fold
             model = LogisticRegression(**self.best_params, max_iter=2000)
             model.fit(X_fold_train_resampled, y_fold_train_resampled)
             
             # Make predictions
-            y_pred = model.predict(X_fold_val)
+            y_pred = model.predict(X_fold_val_scaled)
             
             # Calculate metrics
             accuracies.append(accuracy_score(y_fold_val, y_pred))
-            precisions.append(precision_score(y_fold_val, y_pred))
-            recalls.append(recall_score(y_fold_val, y_pred))
-            f1_scores.append(f1_score(y_fold_val, y_pred))
+            precisions.append(precision_score(y_fold_val, y_pred, zero_division=0))
+            recalls.append(recall_score(y_fold_val, y_pred, zero_division=0))
+            f1_scores.append(f1_score(y_fold_val, y_pred, zero_division=0))
             
             print(f"Fold {fold}/{k} completed")
         
@@ -196,17 +231,18 @@ class OralCancerModel:
         print("\nBest parameters:", self.best_params)
         print("Best F1 score:", grid.best_score_)
         
-        # Perform detailed k-fold validation
-        X_array = np.array(self.X_train)
-        y_array = np.array(self.y_train)
-        self.kfold_metrics = self.perform_kfold_validation(X_array, y_array)
+        # Perform detailed k-fold validation on original data (before resampling)
+        original_X = self.df.drop('Oral Cancer (Diagnosis)', axis=1).values
+        original_y = self.df['Oral Cancer (Diagnosis)'].values
+        self.kfold_metrics = self.perform_kfold_validation(original_X, original_y)
         
         # Train final model with best parameters on full training set
         self.model = grid.best_estimator_
         
-        # Feature importance analysis
+        # Feature importance analysis (need to use column names from original data)
+        feature_names = self.df.drop('Oral Cancer (Diagnosis)', axis=1).columns
         feature_importance = pd.DataFrame({
-            'Feature': self.X_train.columns,
+            'Feature': feature_names,
             'Importance': abs(self.model.coef_[0])
         }).sort_values('Importance', ascending=False)
         
@@ -347,15 +383,25 @@ class OralCancerModel:
         y_pred = self.model.predict(self.X_test)
         y_prob = self.model.predict_proba(self.X_test)[:, 1]
 
-        print("\n=== Model Evaluation ===")
-        print("\n1. Classification Report on Test Set:")
+        print("\n" + "="*60)
+        print("🔍 MODEL EVALUATION RESULTS")
+        print("="*60)
+        
+        print("\n1. Test Set Performance:")
+        print(f"   Accuracy:  {accuracy_score(self.y_test, y_pred):.3f}")
+        print(f"   Precision: {precision_score(self.y_test, y_pred, zero_division=0):.3f}")
+        print(f"   Recall:    {recall_score(self.y_test, y_pred, zero_division=0):.3f}")
+        print(f"   F1-Score:  {f1_score(self.y_test, y_pred, zero_division=0):.3f}")
+        print(f"   AUC-ROC:   {roc_auc_score(self.y_test, y_prob):.3f}")
+
+        print("\n2. Classification Report on Test Set:")
         print(classification_report(self.y_test, y_pred, zero_division=1))
         
-        print("\n2. K-fold Cross-validation Metrics:")
-        print("Accuracy: {:.3f} (±{:.3f})".format(*self.kfold_metrics['accuracy']))
-        print("Precision: {:.3f} (±{:.3f})".format(*self.kfold_metrics['precision']))
-        print("Recall: {:.3f} (±{:.3f})".format(*self.kfold_metrics['recall']))
-        print("F1-Score: {:.3f} (±{:.3f})".format(*self.kfold_metrics['f1']))
+        print("\n3. K-fold Cross-validation Metrics:")
+        print("   Accuracy:  {:.3f} (±{:.3f})".format(*self.kfold_metrics['accuracy']))
+        print("   Precision: {:.3f} (±{:.3f})".format(*self.kfold_metrics['precision']))
+        print("   Recall:    {:.3f} (±{:.3f})".format(*self.kfold_metrics['recall']))
+        print("   F1-Score:  {:.3f} (±{:.3f})".format(*self.kfold_metrics['f1']))
 
         # Create comprehensive model performance visualization
         self.create_model_performance_summary(save_dir)
@@ -384,12 +430,20 @@ class OralCancerModel:
         plt.close()
         
         print(f"\n📊 All visualizations saved to: {save_dir}")
+        print("="*60)
 
     def save_model(self, save_dir="results/models"):
         os.makedirs(save_dir, exist_ok=True)
         joblib.dump(self.model, f"{save_dir}/logistic_model.pkl")
-        joblib.dump(self.X_train.columns.tolist(), f"{save_dir}/feature_names.pkl")
+        joblib.dump(self.scaler, f"{save_dir}/scaler.pkl")
+        
+        # Save feature names from original dataframe
+        feature_names = self.df.drop('Oral Cancer (Diagnosis)', axis=1).columns.tolist()
+        joblib.dump(feature_names, f"{save_dir}/feature_names.pkl")
+        
         print(f"✅ Model saved to: {save_dir}")
+        print(f"✅ Scaler saved to: {save_dir}")
+        print(f"✅ Feature names saved to: {save_dir}")
 
 def main():
     dataset_path = "Datasets/preprocessed_oral_cancer.csv"

@@ -152,6 +152,46 @@ class OralCancerDataPreprocessor:
             
             print(f"📈 Dataset after cleaning: {self.df.shape}")
             
+            # Filter dataset to retain only the most informative samples
+            print(f"\n🎯 Filtering for high-quality training samples...")
+            
+            before_rows = len(self.df)
+            
+            # Define high-impact risk factors and protective factors
+            high_risk_factors = ['Tobacco Use', 'Alcohol Consumption', 'HPV Infection', 'Betel Quid Use']
+            moderate_risk_factors = ['Chronic Sun Exposure', 'Poor Oral Hygiene', 'Family History of Cancer', 'Compromised Immune System']
+            
+            # Calculate risk scores for each row
+            self.df['high_risk_score'] = 0
+            self.df['moderate_risk_score'] = 0
+            
+            for factor in high_risk_factors:
+                self.df['high_risk_score'] += (self.df[factor] == 'Yes').astype(int)
+            
+            for factor in moderate_risk_factors:
+                self.df['moderate_risk_score'] += (self.df[factor] == 'Yes').astype(int)
+            
+            # Create filtering conditions for clear patterns
+            # High-risk profiles: 3+ high-risk factors OR 2+ high-risk + 2+ moderate-risk
+            high_risk_clear = (self.df['high_risk_score'] >= 3) | \
+                             ((self.df['high_risk_score'] >= 2) & (self.df['moderate_risk_score'] >= 2))
+            
+            # Low-risk profiles: 0-1 high-risk factors AND good diet (High) AND ≤1 moderate risk
+            low_risk_clear = (self.df['high_risk_score'] <= 1) & \
+                            (self.df['Diet (Fruits & Vegetables Intake)'] == 'High') & \
+                            (self.df['moderate_risk_score'] <= 1)
+            
+            # Keep only samples with clear risk patterns
+            clear_patterns = high_risk_clear | low_risk_clear
+            self.df = self.df[clear_patterns].copy()
+            
+            # Drop temporary scoring columns
+            self.df = self.df.drop(['high_risk_score', 'moderate_risk_score'], axis=1)
+            
+            after_rows = len(self.df)
+            print(f"✅ Kept {after_rows:,} rows (from {before_rows:,}) with clear risk patterns")
+            print(f"📊 Filtered dataset shape: {self.df.shape}")
+            
             # Show original value distributions
             print("\n📋 Original value distributions:")
             for col in self.required_features:
